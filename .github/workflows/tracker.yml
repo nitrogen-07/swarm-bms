@@ -1,0 +1,73 @@
+name: BMS Autonomous Swarm Tracker
+
+on:
+#  schedule:
+#    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        show: 
+          - { id: "3768", time: "11:00 AM", date_code: "20260906", display: "06-Sep-2026", screen: "4K DOLBY ATMOS" }
+          - { id: "3770", time: "06:00 PM", date_code: "20260906", display: "06-Sep-2026", screen: "4K DOLBY ATMOS" }
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      VENUE_CODE: "SUDA"
+      VENUE_NAME: "Sudarshan 35MM 4k Laser & Dolby Atmos: RTC X Roads"
+      TARGET_EVENT: "ET00511702"
+      MOVIE_NAME: "I'm Game (Telugu) - Telugu"
+      CITY_CODE: "hyd"
+      TARGET_SESSION_ID: ${{ matrix.show.id }}
+      TARGET_SHOW_TIME: ${{ matrix.show.time }}
+      TARGET_DATE_CODE: ${{ matrix.show.date_code }}
+      TARGET_DISPLAY_DATE: ${{ matrix.show.display }}
+      TARGET_SCREEN: ${{ matrix.show.screen }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Network Engine
+        run: pip install curl_cffi
+
+      - name: Run Seat Tracker
+        run: python bms_swarm.py
+
+      # Fixed quadruple escaping ensures literal ${ job.status } in YAML
+      - name: Notify on Stop
+        if: cancelled() || failure()
+        run: python bms_swarm.py --notify-stop "GitHub Workflow ${{ job.status }}"
+
+      - name: Commit State Relay
+        if: always()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          touch "state_${{ matrix.show.id }}.json"
+          git add "state_${{ matrix.show.id }}.json"
+          
+          if git diff --staged --quiet; then
+            echo "No state changes to commit."
+          else
+            git commit -m "Relay state for ${{ matrix.show.id }}"
+            for i in {1..5}; do
+              git pull --rebase origin main
+              if git push origin main; then
+                echo "State successfully relayed!"
+                break
+              else
+                echo "Collision detected. Retrying..."
+                sleep $((RANDOM % 10 + 2))
+              fi
+            done
+          fi
