@@ -7,7 +7,7 @@ import re
 from curl_cffi import requests
 
 # ==============================================================================
-# 1. UNIVERSAL CONFIGURATION
+# 1. UNIVERSAL CONFIGURATION (Pulled per-matrix job from GitHub YAML)
 # ==============================================================================
 VENUE_CODE = os.environ.get("VENUE_CODE")
 VENUE_NAME = os.environ.get("VENUE_NAME", VENUE_CODE)
@@ -16,7 +16,7 @@ MOVIE_NAME = os.environ.get("MOVIE_NAME")
 CITY_CODE = os.environ.get("CITY_CODE", "hyd")
 
 MIN_SEATS_ALERT_THRESHOLD = int(os.environ.get("MIN_SEATS_ALERT_THRESHOLD", 5))
-POLL_INTERVAL_SECONDS = 90
+POLL_INTERVAL_SECONDS = 90  # Strict 90s interval for GitHub Actions ToS safety
 MAX_RUNTIME_SECONDS = (5 * 3600) + (50 * 60)
 
 STATUS_AVAILABLE = ['1', '4']
@@ -32,7 +32,8 @@ def get_headers():
     return {"X-App-Code": "MOBAND2", "Lang": "en", "X-Platform": "AND"}
 
 def send_telegram_notification(message, timeout=10):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: return False
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -62,7 +63,8 @@ def fetch_seat_counts(session, session_id):
     try:
         response = session.post(url, headers=headers, data=payload, timeout=15)
         str_data = response.json().get("BookMyShow", {}).get("strData", "")
-        if not str_data or "||" not in str_data: return None, None
+        if not str_data or "||" not in str_data:
+            return None, None
 
         sections = str_data.split("||")
         rows = sections[1].split("|")
@@ -94,7 +96,7 @@ def fetch_seat_counts(session, session_id):
         return None, None
 
 # ==============================================================================
-# 4. SWARM RUNNER ENGINE (With Strict Row Logic)
+# 4. SWARM RUNNER ENGINE (With Composite State File & Strict Row Logic)
 # ==============================================================================
 def run_single_runner():
     session_id = os.environ.get("TARGET_SESSION_ID")
@@ -105,9 +107,11 @@ def run_single_runner():
     
     seat_url = f"https://in.bookmyshow.com/movies/{CITY_CODE}/seat-layout/{TARGET_EVENT}/{VENUE_CODE}/{session_id}/{date_code}"
 
-    if not session_id: return
+    if not session_id:
+        return
 
-    state_file = f"state_{session_id}.json"
+    # Composite filename prevents collisions if two venues share the same Session ID number
+    state_file = f"state_{VENUE_CODE}_{session_id}.json"
     http_session = requests.Session(impersonate="chrome120")
 
     print("\n" + "=" * 65)
@@ -116,7 +120,7 @@ def run_single_runner():
     print(f"🏛 Venue   : {VENUE_NAME} ({VENUE_CODE})")
     print(f"🖥 Screen  : {screen_name}")
     print(f"📅 Schedule: {display_date} at {show_time}")
-    print(f"🎟 Session : {session_id}")
+    print(f"🎟 Session : {session_id} (Event: {TARGET_EVENT})")
     print(f"🔔 Rules   : >= {MIN_SEATS_ALERT_THRESHOLD} seats in the SAME row")
     print(f"⏱ Interval: {POLL_INTERVAL_SECONDS}s")
     print("=" * 65 + "\n")
@@ -124,7 +128,7 @@ def run_single_runner():
     tg_startup_msg = (
         f"🚀 <b>Swarm Runner Active!</b>\n\n"
         f"🎬 <b>Movie:</b> {MOVIE_NAME}\n"
-        f"🏛 <b>Venue:</b> {VENUE_NAME}\n"
+        f"🏛 <b>Venue:</b> {VENUE_NAME} ({VENUE_CODE})\n"
         f"🖥 <b>Screen:</b> {screen_name}\n"
         f"📅 <b>Showtime:</b> {display_date} | {show_time}\n"
         f"🎟 <b>Session ID:</b> {session_id}\n"
@@ -188,7 +192,7 @@ def run_single_runner():
                         alert_msg = (
                             f"🚨 <b>SEATS UNBLOCKED!</b>\n\n"
                             f"🎬 <b>Movie:</b> {MOVIE_NAME}\n"
-                            f"🏛 <b>Venue:</b> {VENUE_NAME}\n"
+                            f"🏛 <b>Venue:</b> {VENUE_NAME} ({VENUE_CODE})\n"
                             f"🖥 <b>Screen:</b> {screen_name}\n\n"
                             f"📅 <b>Showtime:</b> {display_date} | {show_time}\n"
                             f"💺 <b>Unblocked:</b> +{total_qualifying_unblocked} seats (Total Available: {current_avail_count})\n\n"
@@ -207,7 +211,7 @@ def run_single_runner():
                     last_known_seats = avail_seats_dict
                     last_known_count = current_avail_count
 
-                # Continuously save state to disk to protect against sudden cancellation
+                # Save state locally after every poll so cancellations don't lose progress
                 try:
                     with open(state_file, "w") as f:
                         json.dump({"available_seats": last_known_seats}, f)
@@ -219,13 +223,12 @@ def run_single_runner():
 
             time.sleep(POLL_INTERVAL_SECONDS)
             
-        # If loop finishes naturally at 6 hours
         notify_stop_standalone("Completed 6-Hour Cycle (Relaying runner)")
         
     except KeyboardInterrupt:
         notify_stop_standalone("Manual Cancellation (Ctrl+C)")
         sys.exit(0)
-    except Exception as e:
+    except Exception:
         raise
 
 # ==============================================================================
@@ -240,7 +243,7 @@ def notify_stop_standalone(reason):
     stop_msg = (
         f"🛑 <b>BMS Tracker Stopped</b>\n\n"
         f"🎬 <b>Movie:</b> {MOVIE_NAME}\n"
-        f"🏛 <b>Venue:</b> {VENUE_NAME}\n"
+        f"🏛 <b>Venue:</b> {VENUE_NAME} ({VENUE_CODE})\n"
         f"🖥 <b>Screen:</b> {screen_name}\n"
         f"📅 <b>Showtime:</b> {display_date} | {show_time}\n"
         f"🎟 <b>Session ID:</b> {session_id}\n"
