@@ -1,8 +1,6 @@
 name: BMS Automated Tracker
 
 on:
-#  schedule:
-#    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
@@ -16,11 +14,7 @@ jobs:
         show: 
           - { id: "6248", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523252", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D) (Telugu) - Telugu", time: "07:00 AM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
           - { id: "6324", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523252", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D) (Telugu) - Telugu", time: "07:02 PM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
-          - { id: "6249", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "11:00 AM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
-          - { id: "6323", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "03:00 PM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
-          - { id: "6325", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "11:02 PM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
           - { id: "6328", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523252", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D) (Telugu) - Telugu", time: "07:00 AM", date_code: "20261106", display: "06-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
-          - { id: "6329", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "11:00 AM", date_code: "20261106", display: "06-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
       CITY_CODE: "hyd"
@@ -76,3 +70,22 @@ jobs:
               fi
             done
           fi
+
+  # ==========================================================================
+  # 24/7 SELF-RELAY JOB: Automatically starts the next 6-hour shift on success!
+  # ==========================================================================
+  relay:
+    needs: track
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Trigger Next 6-Hour Cycle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run "BMS Automated Tracker" --ref main
