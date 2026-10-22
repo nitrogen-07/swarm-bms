@@ -1,4 +1,4 @@
-name: BMS Autonomous Swarm Tracker
+name: BMS Automated Tracker
 
 on:
 #  schedule:
@@ -14,15 +14,20 @@ jobs:
       fail-fast: false
       matrix:
         show: 
-          - { id: "3768", time: "11:00 AM", date_code: "20260906", display: "06-Sep-2026", screen: "4K DOLBY ATMOS" }
-          - { id: "3770", time: "06:00 PM", date_code: "20260906", display: "06-Sep-2026", screen: "4K DOLBY ATMOS" }
+          - { id: "6248", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523252", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D) (Telugu) - Telugu", time: "07:00 AM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
+          - { id: "6324", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523252", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D) (Telugu) - Telugu", time: "07:02 PM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
+          - { id: "6249", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "11:00 AM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
+          - { id: "6323", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "03:00 PM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
+          - { id: "6325", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "11:02 PM", date_code: "20261105", display: "05-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
+          - { id: "6328", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523252", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D) (Telugu) - Telugu", time: "07:00 AM", date_code: "20261106", display: "06-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
+          - { id: "6329", venue_code: "ALUC", venue_name: "ALLU Cinemas: Kokapet", event_code: "ET00523251", movie_name: "Namit Malhotra's Ramayana (DOLBY CINEMA 3D)(Hindi) - Hindi", time: "11:00 AM", date_code: "20261106", display: "06-Nov-2026", screen: "DOLBY CINEMA (SCREEN 1)" }
     env:
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      VENUE_CODE: "SUDA"
-      VENUE_NAME: "Sudarshan 35MM 4k Laser & Dolby Atmos: RTC X Roads"
-      TARGET_EVENT: "ET00511702"
-      MOVIE_NAME: "I'm Game (Telugu) - Telugu"
       CITY_CODE: "hyd"
+      VENUE_CODE: ${{ matrix.show.venue_code }}
+      VENUE_NAME: ${{ matrix.show.venue_name }}
+      TARGET_EVENT: ${{ matrix.show.event_code }}
+      MOVIE_NAME: ${{ matrix.show.movie_name }}
       TARGET_SESSION_ID: ${{ matrix.show.id }}
       TARGET_SHOW_TIME: ${{ matrix.show.time }}
       TARGET_DATE_CODE: ${{ matrix.show.date_code }}
@@ -43,7 +48,6 @@ jobs:
       - name: Run Seat Tracker
         run: python bms_swarm.py
 
-      # Fixed quadruple escaping ensures literal ${ job.status } in YAML
       - name: Notify on Stop
         if: cancelled() || failure()
         run: python bms_swarm.py --notify-stop "GitHub Workflow ${{ job.status }}"
@@ -53,13 +57,14 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          touch "state_${{ matrix.show.id }}.json"
-          git add "state_${{ matrix.show.id }}.json"
+          STATE_FILE="state_${{ matrix.show.venue_code }}_${{ matrix.show.id }}.json"
+          touch "$STATE_FILE"
+          git add "$STATE_FILE"
           
           if git diff --staged --quiet; then
             echo "No state changes to commit."
           else
-            git commit -m "Relay state for ${{ matrix.show.id }}"
+            git commit -m "Relay state for ${{ matrix.show.venue_code }} ${{ matrix.show.id }}"
             for i in {1..5}; do
               git pull --rebase origin main
               if git push origin main; then
